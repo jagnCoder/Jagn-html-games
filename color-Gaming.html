@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB Color Guessing Game</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font family -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light gray background */
+        }
+        /* Custom styles for the game elements */
+        .game-card {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+        .color-square {
+            width: 100%;
+            padding-bottom: 50%; /* 2:1 aspect ratio for the rectangle */
+            border: 8px solid #374151; /* Dark border for contrast */
+            transition: background-color 0.3s ease-in-out, transform 0.1s;
+        }
+        .color-button {
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            font-weight: 700;
+            padding: 1rem;
+            border: 3px solid #1f2937;
+            /* Ensure text is centered now that there are no swatches */
+            text-align: center; 
+        }
+        .color-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .color-button:active {
+            transform: translateY(0);
+        }
+        .incorrect {
+            opacity: 0.2;
+            cursor: not-allowed;
+            background-color: #fecaca; /* Light red feedback */
+        }
+        .status-message {
+            font-size: 1.25rem;
+            min-height: 2rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Game Container -->
+    <div id="game-container" class="game-card w-full max-w-lg bg-white rounded-xl p-6 md:p-8 text-center">
+        
+        <h1 class="text-4xl font-extrabold mb-4 text-gray-800">Guess The Color!</h1>
+        <p class="text-gray-600 mb-4">Which RGB code matches the box below?</p>
+
+        <!-- RGB Reference Swatches (REMAINS, as only option swatches were requested to be removed) -->
+        <div class="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-bold mb-3 text-gray-700">RGB Reference Swatches</h3>
+            <div class="flex justify-center space-x-6">
+                <!-- Red Swatch -->
+                <div class="text-center">
+                    <div class="w-12 h-12 rounded-full border-2 border-red-500 mx-auto" style="background-color: rgb(255, 0, 0);"></div>
+                    <p class="text-xs mt-1 font-semibold text-gray-600">Red</p>
+                </div>
+                <!-- Green Swatch -->
+                <div class="text-center">
+                    <div class="w-12 h-12 rounded-full border-2 border-green-500 mx-auto" style="background-color: rgb(0, 255, 0);"></div>
+                    <p class="text-xs mt-1 font-semibold text-gray-600">Green</p>
+                </div>
+                <!-- Blue Swatch -->
+                <div class="text-center">
+                    <div class="w-12 h-12 rounded-full border-2 border-blue-500 mx-auto" style="background-color: rgb(0, 0, 255);"></div>
+                    <p class="text-xs mt-1 font-semibold text-gray-600">Blue</p>
+                </div>
+            </div>
+        </div>
+        <!-- End of Reference Swatches -->
+
+        <!-- Color Display Square -->
+        <div id="color-square" class="color-square rounded-lg mb-8 mx-auto" style="background-color: #374151;">
+            <!-- This square will be filled with the target color via JavaScript -->
+        </div>
+
+        <!-- Status Message -->
+        <div id="status-message" class="status-message text-gray-700 mb-6">
+            Pick a color to start.
+        </div>
+
+        <!-- Buttons Container -->
+        <div id="button-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Buttons will be injected here by JavaScript -->
+        </div>
+
+        <!-- New Game Button -->
+        <button id="new-game-button" class="mt-8 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-bold text-lg">
+            New Colors
+        </button>
+
+    </div>
+
+    <script>
+        // Global variables
+        let targetColor;
+        const buttonContainer = document.getElementById('button-container');
+        const colorSquare = document.getElementById('color-square');
+        const statusMessage = document.getElementById('status-message');
+        const newGameButton = document.getElementById('new-game-button');
+        const numberOfOptions = 6; // Fixed number of options for this game
+
+        /**
+         * Generates a random integer between 0 and 255 (inclusive).
+         * @returns {number} A random integer.
+         */
+        function randomRGBValue() {
+            return Math.floor(Math.random() * 256);
+        }
+
+        /**
+         * Generates a random RGB color string, e.g., "rgb(120, 50, 200)".
+         * @returns {string} The generated RGB color string.
+         */
+        function generateRandomColor() {
+            const r = randomRGBValue();
+            const g = randomRGBValue();
+            const b = randomRGBValue();
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        /**
+         * Shuffles an array using the Fisher-Yates algorithm.
+         * @param {Array} array - The array to shuffle.
+         * @returns {Array} The shuffled array.
+         */
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        /**
+         * Generates a set of unique color options, including the correct color.
+         * @param {string} correctColor - The target RGB color.
+         * @returns {string[]} An array of color strings, shuffled.
+         */
+        function generateOptions(correctColor) {
+            const options = [correctColor];
+            while (options.length < numberOfOptions) {
+                const newColor = generateRandomColor();
+                if (!options.includes(newColor)) {
+                    options.push(newColor);
+                }
+            }
+            return shuffleArray(options);
+        }
+
+        /**
+         * Handles the player's button click guess.
+         * We use event.currentTarget to reliably target the button element, 
+         * and dataset.color to get the stored color value.
+         * @param {Event} event - The click event object.
+         */
+        function handleGuess(event) {
+            const clickedButton = event.currentTarget; // Use currentTarget to get the button
+            const guess = clickedButton.dataset.color; // Get color from data attribute
+
+            // Ignore clicks on buttons already marked incorrect
+            if (clickedButton.classList.contains('incorrect')) {
+                return;
+            }
+
+            if (guess === targetColor) {
+                // Correct guess logic
+                statusMessage.textContent = "🥳 Correct! New colors loading...";
+                statusMessage.classList.remove('text-gray-700', 'text-red-600');
+                statusMessage.classList.add('text-green-600');
+                
+                // Animate all buttons to show the correct color and disable them
+                document.querySelectorAll('.color-button').forEach(btn => {
+                    // Only apply color change to the button itself (swatch logic removed)
+                    btn.style.backgroundColor = targetColor;
+                    btn.style.color = 'white'; // Ensure text is visible
+                    btn.style.borderColor = 'white';
+                    btn.disabled = true;
+                });
+
+                // Set a timeout before starting a new game
+                setTimeout(newGame, 1500);
+
+            } else {
+                // Incorrect guess logic
+                statusMessage.textContent = "❌ Try again!";
+                statusMessage.classList.remove('text-gray-700', 'text-green-600');
+                statusMessage.classList.add('text-red-600');
+
+                // Mark the incorrect button
+                clickedButton.classList.add('incorrect');
+                clickedButton.disabled = true;
+            }
+        }
+
+        /**
+         * Sets up a new round of the game.
+         */
+        function newGame() {
+            // 1. Generate the new target color
+            targetColor = generateRandomColor();
+
+            // 2. Update the color square
+            colorSquare.style.backgroundColor = targetColor;
+
+            // 3. Clear previous buttons and status
+            buttonContainer.innerHTML = '';
+            statusMessage.textContent = "Which one is it?";
+            statusMessage.classList.remove('text-red-600', 'text-green-600');
+            statusMessage.classList.add('text-gray-700');
+
+            // 4. Generate options
+            const colorOptions = generateOptions(targetColor);
+
+            // 5. Create and attach buttons (TEXT ONLY)
+            colorOptions.forEach(color => {
+                const button = document.createElement('button');
+                
+                // Store the color value for guessing
+                button.dataset.color = color;
+                
+                // Set the text content directly
+                button.textContent = color;
+
+                // Button styling (removed flex classes for simple centering)
+                button.classList.add(
+                    'color-button', 
+                    'rounded-lg', 
+                    'bg-gray-100', 
+                    'hover:bg-gray-200'
+                );
+                
+                // Attach the click handler to the button
+                button.addEventListener('click', handleGuess);
+                
+                buttonContainer.appendChild(button);
+            });
+        }
+        
+        // Attach the new game button listener
+        newGameButton.addEventListener('click', newGame);
+
+        // Start the game on page load
+        window.onload = newGame;
+
+    </script>
+</body>
+</html>
