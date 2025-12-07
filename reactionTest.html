@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction Time Tester</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the game area */
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.4s ease; /* Smooth background transition */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f3f4f6;
+        }
+
+        #game-area {
+            height: 80vh;
+            width: 100%;
+            max-width: 600px;
+            cursor: pointer;
+            border-radius: 1.5rem; /* Large rounded corners */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            user-select: none;
+            position: relative;
+            background-color: #fff;
+            padding: 1rem;
+        }
+
+        .text-overlay {
+            color: #1f2937; /* Dark gray text */
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1.4;
+            transition: color 0.4s ease;
+        }
+
+        #start-button {
+            padding: 0.75rem 2rem;
+            font-size: 1.5rem;
+            font-weight: 800;
+            border-radius: 9999px; /* Pill shape */
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s;
+        }
+
+        #start-button:hover {
+            background-color: #4338ca;
+        }
+
+        #start-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* State specific styles */
+        .state-ready { background-color: #fcd34d; } /* Yellow/Amber: Wait */
+        .state-go { background-color: #10b981; } /* Green: Click now */
+        .state-too-early { background-color: #ef4444; } /* Red: Too early */
+        .state-initial { background-color: #fff; } /* White: Initial/Result */
+
+        /* Text colors for states */
+        .state-ready .text-overlay { color: #1f2937; }
+        .state-go .text-overlay { color: white; }
+        .state-too-early .text-overlay { color: white; }
+        .state-initial .text-overlay { color: #1f2937; }
+
+        .time-display {
+            font-size: 4rem;
+            font-weight: 900;
+            color: #4f46e5;
+            margin-top: 1rem;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 640px) {
+            #game-area {
+                height: 90vh;
+                margin: 0 1rem;
+            }
+            .text-overlay {
+                font-size: 1.25rem;
+            }
+            .time-display {
+                font-size: 3rem;
+            }
+            #start-button {
+                font-size: 1.25rem;
+            }
+        }
+
+    </style>
+</head>
+<body class="state-initial">
+
+    <div id="game-area" onclick="handleInput()">
+        <div id="display-content" class="text-overlay">
+            <h1 class="text-4xl font-extrabold mb-8">Reaction Time Test</h1>
+            <p>Click the button below to start. Your goal is to click the screen as soon as it turns green.</p>
+        </div>
+
+        <div id="result-box" class="hidden">
+            <!-- Results will be displayed here -->
+        </div>
+
+        <button id="start-button" onclick="startGame(event)">Start Test</button>
+    </div>
+
+    <script>
+        // Game state variables
+        let state = 'initial'; // 'initial', 'ready', 'go', 'too_early', 'result'
+        let timeoutId = null;
+        let startTime = 0;
+        let authReady = false; // Not strictly needed for this simple game, but good practice if using Firebase
+
+        // DOM Elements
+        const body = document.body;
+        const gameArea = document.getElementById('game-area');
+        const displayContent = document.getElementById('display-content');
+        const startButton = document.getElementById('start-button');
+        const resultBox = document.getElementById('result-box');
+
+        // --- Game Logic Functions ---
+
+        /**
+         * Resets the game to the initial state.
+         */
+        function resetGame() {
+            clearTimeout(timeoutId);
+            state = 'initial';
+            startTime = 0;
+
+            // Update UI
+            body.className = 'state-initial';
+            displayContent.innerHTML = '<h1 class="text-4xl font-extrabold mb-8">Reaction Time Test</h1><p>Click the button below to start. Your goal is to click the screen as soon as it turns green.</p>';
+            resultBox.innerHTML = '';
+            resultBox.classList.add('hidden');
+            startButton.style.display = 'block';
+        }
+
+        /**
+         * Starts the game sequence.
+         */
+        function startGame(event) {
+            // Stop the click from propagating to the game-area handler immediately
+            event.stopPropagation();
+            
+            // Set initial waiting state
+            state = 'ready';
+            const waitTime = Math.random() * 4000 + 1000; // Random delay between 1000ms (1s) and 5000ms (5s)
+
+            // Update UI for waiting
+            body.className = 'state-ready';
+            displayContent.innerHTML = '<h2>Wait for green...</h2><p class="text-lg mt-2">Clicking too early will reset the test.</p>';
+            startButton.style.display = 'none';
+
+            // Set the timeout to change to GO state
+            timeoutId = setTimeout(go, waitTime);
+        }
+
+        /**
+         * Changes the state to 'go' (green).
+         */
+        function go() {
+            state = 'go';
+            startTime = performance.now(); // Record the exact time the screen turned green
+
+            // Update UI for GO state
+            body.className = 'state-go';
+            displayContent.innerHTML = '<h2>Click now!</h2><p class="text-lg mt-2">GO! GO! GO!</p>';
+        }
+
+        /**
+         * Handles all user clicks on the game area.
+         */
+        function handleInput() {
+            const clickTime = performance.now();
+
+            if (state === 'initial' || state === 'result') {
+                // If the user clicks anywhere in the initial or result state, it should be a new start attempt.
+                // However, the start button handles the actual start, so we just reset if they click the area.
+                resetGame();
+            }
+            else if (state === 'ready') {
+                // Too early click!
+                clearTimeout(timeoutId); // Stop the green transition
+                state = 'too_early';
+                
+                // Update UI for too early
+                body.className = 'state-too-early';
+                displayContent.innerHTML = '<h2>Too Early!</h2><p class="text-lg mt-2">You clicked before the screen turned green.</p>';
+                
+                // Show reset button after a moment
+                setTimeout(() => {
+                    startButton.textContent = 'Try Again';
+                    startButton.style.display = 'block';
+                    startButton.onclick = (e) => { e.stopPropagation(); startGame(e); };
+                    state = 'result'; // Move to result state so subsequent clicks don't interfere
+                }, 1500);
+            }
+            else if (state === 'go') {
+                // Success! Calculate reaction time.
+                const reactionTime = Math.round(clickTime - startTime);
+                state = 'result';
+                
+                // Update UI for result
+                body.className = 'state-initial'; // Return to neutral background
+                displayContent.innerHTML = '<h2>Success!</h2><p class="text-xl font-medium mt-2">Your reaction time was:</p>';
+                
+                resultBox.innerHTML = `
+                    <div class="time-display">${reactionTime}</div>
+                    <div class="text-2xl font-bold text-gray-700">milliseconds</div>
+                `;
+                resultBox.classList.remove('hidden');
+
+                startButton.textContent = 'Play Again';
+                startButton.style.display = 'block';
+                // Reset the button's behavior back to calling startGame
+                startButton.onclick = (e) => { e.stopPropagation(); startGame(e); };
+
+            }
+        }
+
+        // Initialize the game when the page loads
+        window.onload = resetGame;
+
+    </script>
+</body>
+</html>
